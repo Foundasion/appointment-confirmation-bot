@@ -70,6 +70,9 @@ class OpenAIRealtimeHandler:
             system_message += f"Doctor: {self.appointment_data.get('doctor', 'the doctor')}\n"
             system_message += f"Date: {self.appointment_data.get('date', 'the scheduled date')}\n"
             system_message += f"Time: {self.appointment_data.get('time', 'the scheduled time')}\n"
+            print(f"Added appointment details to system message: {self.appointment_data}")
+        else:
+            print("No appointment data available for system message")
         
         # Send session update to OpenAI
         session_update = {
@@ -84,8 +87,32 @@ class OpenAIRealtimeHandler:
                 "temperature": 0.7,
             }
         }
-        print('Sending session update:', json.dumps(session_update))
-        await openai_ws.send(json.dumps(session_update))
+        print('Sending session update to OpenAI:', json.dumps(session_update))
+        try:
+            await openai_ws.send(json.dumps(session_update))
+            print("Session update sent successfully")
+            
+            # Wait for a response to confirm the session was created
+            print("Waiting for session.created event...")
+            for _ in range(5):  # Try up to 5 times with a timeout
+                try:
+                    response_raw = await asyncio.wait_for(openai_ws.recv(), timeout=2.0)
+                    response = json.loads(response_raw)
+                    print(f"Received response from OpenAI: {response}")
+                    
+                    if response.get('type') == 'session.created':
+                        print("Session created successfully!")
+                        return
+                    elif response.get('type') == 'error':
+                        print(f"Error from OpenAI: {response}")
+                        raise Exception(f"OpenAI error: {response.get('error', {}).get('message', 'Unknown error')}")
+                except asyncio.TimeoutError:
+                    print("Timeout waiting for OpenAI response, retrying...")
+            
+            print("Failed to receive session.created event after multiple attempts")
+        except Exception as e:
+            print(f"Error sending session update to OpenAI: {e}")
+            raise
     
     async def send_initial_conversation_item(self, openai_ws: websockets.WebSocketClientProtocol) -> None:
         """Send initial conversation item to start the call."""

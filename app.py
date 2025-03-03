@@ -91,28 +91,55 @@ async def handle_media_stream(websocket: WebSocket):
     appointment_data = None
     
     try:
-        # Wait for the start message from Twilio
+        # Wait for messages from Twilio
+        print("Waiting for messages from Twilio...")
         message = await websocket.receive_text()
+        print(f"Received message from Twilio: {message}")
         data = json.loads(message)
+        print(f"Parsed data: {data}")
         
+        # Handle the connected event
+        if data['event'] == 'connected':
+            print("Received connected event from Twilio")
+            
+            # Wait for the start message
+            print("Waiting for start message from Twilio...")
+            message = await websocket.receive_text()
+            print(f"Received message from Twilio: {message}")
+            data = json.loads(message)
+            print(f"Parsed data: {data}")
+        
+        # Handle the start event or use a temporary call_sid
         if data['event'] == 'start':
             call_sid = data['start']['callSid']
             print(f"Call SID: {call_sid}")
             
             # Store the WebSocket connection
             active_connections[call_sid] = websocket
+            print(f"Stored WebSocket connection for call {call_sid}")
             
             # Check if this is a call we initiated
             if call_sid in active_calls:
                 appointment_data = active_calls[call_sid].get('appointment_data')
+                print(f"Found appointment data for call {call_sid}: {appointment_data}")
             else:
+                print(f"No appointment data found for call {call_sid} in active_calls")
                 # For incoming calls, try to get appointment data from the caller's phone number
                 # This would be implemented in a real system
                 pass
-            
-            # Initialize OpenAI handler with appointment data
-            openai_handler = OpenAIRealtimeHandler(appointment_data)
-            
+        else:
+            print(f"Unexpected event type: {data['event']}")
+            # Use a temporary call_sid for testing
+            call_sid = f"temp_call_{id(websocket)}"
+            print(f"Using temporary Call SID: {call_sid}")
+            active_connections[call_sid] = websocket
+        
+        # Continue with OpenAI integration regardless of event type
+        print(f"Proceeding with OpenAI integration for call {call_sid}")
+        
+        # Initialize OpenAI handler with appointment data
+        openai_handler = OpenAIRealtimeHandler(appointment_data)
+        
         # Connect to OpenAI
         print("Connecting to OpenAI Realtime API...")
         try:
@@ -124,6 +151,7 @@ async def handle_media_stream(websocket: WebSocket):
                 }
             ) as openai_ws:
                 print("Connected to OpenAI Realtime API successfully")
+                
                 # Initialize the OpenAI session
                 try:
                     await openai_handler.initialize_session(openai_ws)
@@ -139,7 +167,9 @@ async def handle_media_stream(websocket: WebSocket):
                             conversation_manager.set_appointment(appointment_data)
                         
                         # Process audio between Twilio and OpenAI
-                        await process_audio_streams(websocket, openai_ws, openai_handler, call_sid)
+                        stream_sid = data.get('streamSid')
+                        print(f"Using Stream SID: {stream_sid}")
+                        await process_audio_streams(websocket, openai_ws, openai_handler, call_sid, stream_sid)
                         
                         # Update call data with transcript and outcome
                         if call_sid:
@@ -169,7 +199,7 @@ async def handle_media_stream(websocket: WebSocket):
 
 
 async def process_audio_streams(websocket: WebSocket, openai_ws: websockets.WebSocketClientProtocol, 
-                               openai_handler: OpenAIRealtimeHandler, call_sid: str):
+                               openai_handler: OpenAIRealtimeHandler, call_sid: str, stream_sid: str):
     """Process audio streams between Twilio and OpenAI."""
     
     async def receive_from_twilio():
@@ -207,11 +237,12 @@ async def process_audio_streams(websocket: WebSocket, openai_ws: websockets.WebS
                         audio_payload = base64.b64encode(base64.b64decode(response['delta'])).decode('utf-8')
                         audio_delta = {
                             "event": "media",
-                            "streamSid": call_sid,
+                            "streamSid": stream_sid,  # Use the streamSid passed from the parent function
                             "media": {
                                 "payload": audio_payload
                             }
                         }
+                        print(f"Sending audio to Twilio with Stream SID: {stream_sid}")
                         await websocket.send_json(audio_delta)
                     except Exception as e:
                         print(f"Error processing audio data: {e}")
