@@ -22,17 +22,24 @@ LOG_EVENT_TYPES = [
 
 # System message for appointment confirmation
 APPOINTMENT_SYSTEM_MESSAGE = """
-You are an AI assistant for a doctor's office making calls to confirm patient appointments.
-Your task is to:
-1. Greet the patient by name and identify yourself as calling from [Doctor's Office]
-2. Confirm their upcoming appointment (date, time, doctor)
-3. If they confirm, thank them and end the call
-4. If they need to reschedule, collect their preferred date/time
-5. Be professional, friendly, and concise
-6. Do not discuss medical details or personal health information
-7. End the call with a clear summary of the outcome (confirmed or rescheduled)
+You are Samantha, a cheerful and friendly AI assistant for DentaVille Dental Clinic making calls to confirm patient appointments.
 
-Always disclose that you are an AI assistant calling on behalf of the doctor's office.
+Your personality:
+- Warm, upbeat, and personable - like talking to a friendly receptionist
+- Conversational but professional
+- Empathetic and understanding when patients need to reschedule
+- Enthusiastic about helping patients
+
+Your task is to:
+1. Start by immediately identifying yourself: "Hi, this is Samantha, an automated assistant calling from DentaVille Dental Clinic"
+2. Ask if it's a good time to talk about their upcoming appointment
+3. Confirm their upcoming appointment (date, time, dentist)
+4. If they confirm, express genuine appreciation and end the call warmly
+5. If they need to reschedule, be understanding and help find a convenient alternative time
+6. Do not discuss medical details or personal health information
+7. End the call with a clear summary of the outcome (confirmed or rescheduled) and a friendly closing
+
+Always disclose that you are an automated assistant calling on behalf of DentaVille Dental Clinic at the beginning of the call.
 """
 
 
@@ -87,7 +94,8 @@ class OpenAIRealtimeHandler:
                 "temperature": 0.7,
             }
         }
-        print('Sending session update to OpenAI:', json.dumps(session_update))
+        # Print a shorter version of the session update to reduce log noise
+        print('Sending session update to OpenAI (instructions truncated for brevity)')
         try:
             await openai_ws.send(json.dumps(session_update))
             print("Session update sent successfully")
@@ -116,22 +124,22 @@ class OpenAIRealtimeHandler:
     
     async def send_initial_conversation_item(self, openai_ws: websockets.WebSocketClientProtocol) -> None:
         """Send initial conversation item to start the call."""
-        greeting = "Hello, I'm calling from "
-        
         if self.appointment_data:
-            doctor = self.appointment_data.get('doctor', 'the doctor')
+            dentist = self.appointment_data.get('doctor', 'your dentist')
             patient_name = self.appointment_data.get('patient_name', 'there')
             date = self.appointment_data.get('date', 'your upcoming appointment')
             time = self.appointment_data.get('time', '')
             
             greeting = (
-                f"Hello, may I speak with {patient_name}? This is an AI assistant calling "
-                f"on behalf of {doctor}'s office. I'm calling about your appointment "
-                f"scheduled for {date} at {time}. I'd like to confirm if you're still "
-                f"able to make this appointment or if you need to reschedule."
+                f"Hi there! This is Samantha, an automated assistant calling from DentaVille Dental Clinic. "
+                f"Is this {patient_name}? I'm calling about your dental appointment with Dr. {dentist} "
+                f"scheduled for {date} at {time}. Is now a good time to chat for a moment?"
             )
         else:
-            greeting += "the doctor's office. I'm an AI assistant calling to confirm your upcoming appointment."
+            greeting = (
+                f"Hi there! This is Samantha, an automated assistant calling from DentaVille Dental Clinic. "
+                f"I'm calling about your upcoming dental appointment. Is now a good time to chat for a moment?"
+            )
         
         initial_conversation_item = {
             "type": "conversation.item.create",
@@ -156,15 +164,12 @@ class OpenAIRealtimeHandler:
         """Process a message from OpenAI."""
         response = json.loads(message)
         
-        # Log specific event types
-        if response['type'] in LOG_EVENT_TYPES:
-            print(f"Received event: {response['type']}", response)
-        
         # Handle text content for transcript
         if response['type'] == 'response.content.delta' and 'delta' in response:
             content = response['delta'].get('content', '')
             if content:
                 self.conversation_transcript.append({"role": "assistant", "content": content})
+                print(f"AI: \"{content}\"")
                 
                 # Check for appointment confirmation or rescheduling in the response
                 lower_content = content.lower()
@@ -172,6 +177,9 @@ class OpenAIRealtimeHandler:
                     self.call_outcome = "confirmed"
                 elif "reschedule" in lower_content:
                     self.call_outcome = "rescheduled"
+        # Log only error events
+        elif response['type'] == 'error':
+            print(f"Received error from OpenAI: {response}")
         
         return response
     

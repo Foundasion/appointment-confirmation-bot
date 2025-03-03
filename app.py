@@ -213,6 +213,11 @@ async def process_audio_streams(websocket: WebSocket, openai_ws: websockets.WebS
                         "audio": data['media']['payload']
                     }
                     await openai_ws.send(json.dumps(audio_append))
+                elif data['event'] == 'mark' and data.get('mark', {}).get('name') == 'transcript':
+                    # Print user speech transcripts when available
+                    transcript = data.get('mark', {}).get('value', '')
+                    if transcript:
+                        print(f"User: \"{transcript}\"")
                 elif data['event'] == 'stop':
                     print(f"Call {call_sid} has ended")
                     if openai_ws.open:
@@ -242,7 +247,13 @@ async def process_audio_streams(websocket: WebSocket, openai_ws: websockets.WebS
                                 "payload": audio_payload
                             }
                         }
-                        print(f"Sending audio to Twilio with Stream SID: {stream_sid}")
+                        # Only log the first few audio packets to reduce noise
+                        if not hasattr(send_to_twilio, 'audio_packets_sent'):
+                            send_to_twilio.audio_packets_sent = 0
+                        
+                        send_to_twilio.audio_packets_sent += 1
+                        if send_to_twilio.audio_packets_sent <= 3:
+                            print(f"Sending audio to Twilio with Stream SID: {stream_sid}")
                         await websocket.send_json(audio_delta)
                     except Exception as e:
                         print(f"Error processing audio data: {e}")
