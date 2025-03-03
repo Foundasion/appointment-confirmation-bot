@@ -113,7 +113,9 @@ async def handle_media_stream(websocket: WebSocket):
             # Initialize OpenAI handler with appointment data
             openai_handler = OpenAIRealtimeHandler(appointment_data)
             
-            # Connect to OpenAI
+        # Connect to OpenAI
+        print("Connecting to OpenAI Realtime API...")
+        try:
             async with websockets.connect(
                 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01',
                 extra_headers={
@@ -121,29 +123,40 @@ async def handle_media_stream(websocket: WebSocket):
                     "OpenAI-Beta": "realtime=v1"
                 }
             ) as openai_ws:
+                print("Connected to OpenAI Realtime API successfully")
                 # Initialize the OpenAI session
-                await openai_handler.initialize_session(openai_ws)
-                
-                # Have the AI speak first with appointment context
-                await openai_handler.send_initial_conversation_item(openai_ws)
-                
-                # Set up the conversation manager with appointment data
-                if appointment_data:
-                    conversation_manager.set_appointment(appointment_data)
-                
-                # Process audio between Twilio and OpenAI
-                await process_audio_streams(websocket, openai_ws, openai_handler, call_sid)
-                
-                # Update call data with transcript and outcome
-                if call_sid:
-                    transcript = openai_handler.get_transcript()
-                    outcome = openai_handler.get_call_outcome()
+                try:
+                    await openai_handler.initialize_session(openai_ws)
+                    print("OpenAI session initialized successfully")
                     
-                    if outcome:
-                        twilio_handler.update_call_outcome(call_sid, outcome)
-                    
-                    if transcript:
-                        twilio_handler.update_call_transcript(call_sid, transcript)
+                    # Have the AI speak first with appointment context
+                    try:
+                        await openai_handler.send_initial_conversation_item(openai_ws)
+                        print("Initial conversation item sent successfully")
+                        
+                        # Set up the conversation manager with appointment data
+                        if appointment_data:
+                            conversation_manager.set_appointment(appointment_data)
+                        
+                        # Process audio between Twilio and OpenAI
+                        await process_audio_streams(websocket, openai_ws, openai_handler, call_sid)
+                        
+                        # Update call data with transcript and outcome
+                        if call_sid:
+                            transcript = openai_handler.get_transcript()
+                            outcome = openai_handler.get_call_outcome()
+                            
+                            if outcome:
+                                twilio_handler.update_call_outcome(call_sid, outcome)
+                            
+                            if transcript:
+                                twilio_handler.update_call_transcript(call_sid, transcript)
+                    except Exception as e:
+                        print(f"Error sending initial conversation item: {e}")
+                except Exception as e:
+                    print(f"Error initializing OpenAI session: {e}")
+        except Exception as e:
+            print(f"Error connecting to OpenAI Realtime API: {e}")
     
     except WebSocketDisconnect:
         print(f"WebSocket disconnected for call {call_sid}")
