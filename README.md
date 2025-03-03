@@ -59,10 +59,12 @@ A Python-based system that makes outbound phone calls to patients to confirm or 
 
 ## Running the Application
 
-1. Start ngrok to expose your local server:
+1. Install and start ngrok to expose your local server:
    ```bash
    ngrok http 5050
    ```
+   
+   > **Note:** If you don't have ngrok installed, please refer to the [ngrok setup guide](NGROK_SETUP.md) for detailed installation and configuration instructions.
 
 2. Copy the ngrok URL (without the protocol) and update the `DOMAIN` variable in your `.env` file.
 
@@ -106,6 +108,7 @@ The application provides the following API endpoints:
 ```
 appointment_bot/
 ├── .env                  # Environment variables (create from env.example)
+├── .gitignore            # Git ignore file
 ├── requirements.txt      # Python dependencies
 ├── app.py                # Main application
 ├── run.py                # Entry point script
@@ -114,6 +117,7 @@ appointment_bot/
 ├── openai_handler.py     # OpenAI Realtime API integration
 ├── conversation.py       # Conversation flow logic
 ├── database.py           # Mock database interface
+├── NGROK_SETUP.md        # Guide for setting up ngrok
 └── models/               # Data models
     ├── patient.py        # Patient model
     └── appointment.py    # Appointment model
