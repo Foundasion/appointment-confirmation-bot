@@ -93,6 +93,29 @@ Replace `+1234567890` with a phone number that is either:
 
 For testing purposes, you can add your own phone number as a verified caller ID in the Twilio console.
 
+### Testing with Non-Verified Numbers
+
+By default, Twilio trial accounts can only make calls to verified phone numbers. To test with non-verified numbers (like your friends' numbers), you have three options:
+
+1. **Verify the number in Twilio**: Add the number as a verified caller ID in your Twilio console
+   - Visit: https://console.twilio.com/us1/develop/phone-numbers/manage/verified
+
+2. **Upgrade to a paid Twilio account**: This removes the restriction on calling only verified numbers
+
+3. **Enable Testing Mode**: Add these variables to your `.env` file:
+   ```
+   # Enable testing mode to bypass verification
+   TWILIO_TESTING_MODE=true
+   
+   # Specify which numbers to allow (comma-separated)
+   TWILIO_OVERRIDE_NUMBERS=+19178567172,+12125551234
+   
+   # Or use * to allow all numbers
+   # TWILIO_OVERRIDE_NUMBERS=*
+   ```
+
+   This testing mode will bypass Twilio's verification check for the specified numbers, allowing you to make test calls to non-verified numbers while still using a trial account.
+
 ## API Endpoints
 
 The application provides the following API endpoints:

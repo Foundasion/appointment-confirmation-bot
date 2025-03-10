@@ -4,6 +4,8 @@ import asyncio
 from typing import Dict, Any, Optional, List
 from twilio.rest import Client
 from dotenv import load_dotenv
+import time
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
@@ -42,10 +44,24 @@ class TwilioHandler:
             # In a production system, you would implement additional checks here
             # based on your compliance requirements and business rules
             
-            # For demo purposes, we'll allow calls to specific test numbers
-            # OVERRIDE_NUMBERS = ['+1234567890']  # Add your test numbers here
-            # if to_number in OVERRIDE_NUMBERS:
-            #     return True
+            # For testing purposes, you can enable this override to allow calls to specific test numbers
+            # This is useful for testing with friends' numbers without verifying them in Twilio
+            # NOTE: For Twilio trial accounts, you can only call verified numbers unless you upgrade
+            TESTING_MODE = os.getenv('TWILIO_TESTING_MODE', 'false').lower() == 'true'
+            if TESTING_MODE:
+                OVERRIDE_NUMBERS = os.getenv('TWILIO_OVERRIDE_NUMBERS', '').split(',')
+                if to_number in OVERRIDE_NUMBERS or OVERRIDE_NUMBERS == ['*']:
+                    print(f"TESTING MODE: Allowing call to non-verified number {to_number}")
+                    return True
+            
+            # If we get here, the number is not allowed
+            print(f"Number {to_number} is not allowed for outbound calls.")
+            print("To fix this, you can:")
+            print("1. Verify this number as a caller ID in your Twilio account")
+            print("   Visit: https://console.twilio.com/us1/develop/phone-numbers/manage/verified")
+            print("2. Upgrade to a paid Twilio account to remove this restriction")
+            print("3. Enable testing mode by setting TWILIO_TESTING_MODE=true in your .env file")
+            print("   and add the number to TWILIO_OVERRIDE_NUMBERS (comma-separated list or '*' for all)")
             
             return False
         except Exception as e:
