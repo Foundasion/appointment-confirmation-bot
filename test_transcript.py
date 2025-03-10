@@ -10,6 +10,7 @@ import json
 import asyncio
 import argparse
 import time
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -17,9 +18,11 @@ load_dotenv()
 
 # Import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from appointment_bot.database import Database
-from appointment_bot.twilio_handler import TwilioHandler
 from appointment_bot.test_call import make_test_call
+
+# Configuration
+PORT = int(os.getenv('PORT', 5050))
+SERVER_URL = f"http://localhost:{PORT}"
 
 
 async def test_transcript_and_outcome(phone_number: str, appointment_id: str = None, wait_time: int = 60):
@@ -45,28 +48,51 @@ async def test_transcript_and_outcome(phone_number: str, appointment_id: str = N
     
     print("Wait time completed. Retrieving call data...")
     
-    # Initialize the TwilioHandler
-    twilio_handler = TwilioHandler()
+    # Get call status using the API endpoint
+    try:
+        status_response = requests.get(f"{SERVER_URL}/call-status/{call_sid}")
+        if status_response.status_code == 200:
+            status = status_response.json()
+            print(f"\nCall Status:")
+            print(json.dumps(status, indent=2))
+        else:
+            print(f"\nFailed to get call status: {status_response.status_code}")
+            print(status_response.text)
+    except Exception as e:
+        print(f"\nError getting call status: {e}")
     
-    # Get call status
-    status = twilio_handler.get_call_status(call_sid)
-    print(f"\nCall Status:")
-    print(json.dumps(status, indent=2))
+    # Get transcript using the API endpoint
+    try:
+        transcript_response = requests.get(f"{SERVER_URL}/call-transcript/{call_sid}")
+        if transcript_response.status_code == 200:
+            transcript_data = transcript_response.json()
+            transcript = transcript_data.get('transcript', [])
+            print(f"\nTranscript ({len(transcript)} items):")
+            if transcript:
+                for item in transcript:
+                    role = item.get('role', 'unknown')
+                    content = item.get('content', '')
+                    print(f"{role.capitalize()}: {content}")
+            else:
+                print("No transcript available.")
+        else:
+            print(f"\nFailed to get transcript: {transcript_response.status_code}")
+            print(transcript_response.text)
+    except Exception as e:
+        print(f"\nError getting transcript: {e}")
     
-    # Get transcript
-    transcript = twilio_handler.get_call_transcript(call_sid)
-    print(f"\nTranscript ({len(transcript)} items):")
-    if transcript:
-        for item in transcript:
-            role = item.get('role', 'unknown')
-            content = item.get('content', '')
-            print(f"{role.capitalize()}: {content}")
-    else:
-        print("No transcript available.")
-    
-    # Get outcome
-    outcome = twilio_handler.get_call_outcome(call_sid)
-    print(f"\nOutcome: {outcome}")
+    # Get outcome using the API endpoint
+    try:
+        outcome_response = requests.get(f"{SERVER_URL}/call-outcome/{call_sid}")
+        if outcome_response.status_code == 200:
+            outcome_data = outcome_response.json()
+            outcome = outcome_data.get('outcome')
+            print(f"\nOutcome: {outcome}")
+        else:
+            print(f"\nFailed to get outcome: {outcome_response.status_code}")
+            print(outcome_response.text)
+    except Exception as e:
+        print(f"\nError getting outcome: {e}")
     
     print("\nTest completed.")
 
@@ -76,6 +102,10 @@ if __name__ == "__main__":
     parser.add_argument('--phone', required=True, help="The phone number to call, e.g., '+1234567890'")
     parser.add_argument('--appointment', help="Optional appointment ID to use")
     parser.add_argument('--wait', type=int, default=60, help="Time to wait for call completion (seconds)")
+    parser.add_argument('--server-url', help=f"URL of the server (default: {SERVER_URL})")
     args = parser.parse_args()
+    
+    if args.server_url:
+        SERVER_URL = args.server_url
     
     asyncio.run(test_transcript_and_outcome(args.phone, args.appointment, args.wait))
