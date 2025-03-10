@@ -28,17 +28,17 @@ async def make_test_call(phone_number: str, appointment_id: str = None):
         appointment_data = db.get_appointment_details(appointment_id)
         if not appointment_data:
             print(f"Appointment not found with ID: {appointment_id}")
-            return
+            return None
         
         print(f"Using appointment data: {json.dumps(appointment_data, indent=2)}")
     else:
         # Use dummy appointment data
         appointment_data = {
             "appointment_id": "A001",
-            "patient_name": "Test Patient",
+            "patient_name": "Michael Scott",
             "patient_phone": phone_number,
-            "doctor": "Dr. Smith",
-            "date": "Monday, March 3",
+            "doctor": "Dr. Shah",
+            "date": "Monday, March 20th",
             "time": "2:00 PM",
             "status": "scheduled",
             "duration": 30,
@@ -53,10 +53,12 @@ async def make_test_call(phone_number: str, appointment_id: str = None):
         print(f"Call initiated successfully with SID: {call_sid}")
         print("The AI assistant will now call the specified number.")
         print("After the call completes, you can check the transcript and outcome.")
+        return call_sid
     else:
         print("Failed to make call. Check if the number is allowed.")
         print("Make sure you've set up your Twilio credentials correctly in the .env file.")
         print("Also ensure the phone number is a verified caller ID or a Twilio number you own.")
+        return None
 
 
 if __name__ == "__main__":

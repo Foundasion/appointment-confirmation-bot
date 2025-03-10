@@ -18,7 +18,7 @@ load_dotenv()
 
 # Import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from appointment_bot.test_call import make_test_call
+from appointment_bot.tests.test_call import make_test_call
 
 # Configuration
 PORT = int(os.getenv('PORT', 5050))

@@ -118,10 +118,10 @@ class TwilioHandler:
                     'status': call.status,
                     'duration': call.duration,
                     'direction': call.direction,
-                    'from': call.from_,
-                    'to': call.to,
-                    'start_time': call.start_time,
-                    'end_time': call.end_time
+                    'from_number': call.from_formatted,  # Use from_formatted instead of from_
+                    'to_number': call.to_formatted,      # Use to_formatted instead of to
+                    'start_time': str(call.start_time),
+                    'end_time': str(call.end_time)
                 }
             except Exception as e:
                 print(f"Error fetching call: {e}")
