@@ -200,14 +200,26 @@ class OpenAIRealtimeHandler:
                 print(f"[DEBUG] Adding to transcript: {content}")
                 print(f"[DEBUG] Current transcript length: {len(self.conversation_transcript)}")
                 
-                # Check for appointment confirmation or rescheduling in the response
+                # Enhanced outcome detection with more keywords
                 lower_content = content.lower()
-                if "confirm" in lower_content and "appointment" in lower_content:
+                
+                # Check for confirmation keywords
+                if any(phrase in lower_content for phrase in [
+                    "confirm", "confirmed", "appointment is confirmed", 
+                    "appointment is set", "see you on", "look forward to seeing you",
+                    "thank you for confirming", "glad you can make it"
+                ]):
                     self.call_outcome = "confirmed"
-                    print(f"[DEBUG] Setting call outcome to: confirmed")
-                elif "reschedule" in lower_content:
+                    print(f"[DEBUG] Setting call outcome to: confirmed (from assistant response)")
+                
+                # Check for rescheduling keywords
+                elif any(phrase in lower_content for phrase in [
+                    "reschedule", "rescheduled", "new appointment", 
+                    "different time", "another time", "alternative time",
+                    "moved your appointment", "changed your appointment"
+                ]):
                     self.call_outcome = "rescheduled"
-                    print(f"[DEBUG] Setting call outcome to: rescheduled")
+                    print(f"[DEBUG] Setting call outcome to: rescheduled (from assistant response)")
         # Log only error events
         elif response['type'] == 'error':
             print(f"Received error from OpenAI: {response}")

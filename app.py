@@ -219,20 +219,35 @@ async def process_audio_streams(websocket: WebSocket, openai_ws: websockets.WebS
         try:
             async for message in websocket.iter_text():
                 data = json.loads(message)
+                print(f"[DEBUG] Received event from Twilio: {data['event']}")
+                
                 if data['event'] == 'media' and openai_ws.open:
                     audio_append = {
                         "type": "input_audio_buffer.append",
                         "audio": data['media']['payload']
                     }
                     await openai_ws.send(json.dumps(audio_append))
-                elif data['event'] == 'mark' and data.get('mark', {}).get('name') == 'transcript':
-                    # Print user speech transcripts when available
-                    transcript = data.get('mark', {}).get('value', '')
-                    if transcript:
-                        print(f"User: \"{transcript}\"")
-                        # Add to the OpenAI handler's transcript
-                        openai_handler.conversation_transcript.append({"role": "user", "content": transcript})
-                        print(f"[DEBUG] Added user transcript to conversation: {transcript}")
+                elif data['event'] == 'mark':
+                    # Print detailed info about mark events
+                    print(f"[DEBUG] Mark event received: {data.get('mark', {})}")
+                    
+                    if data.get('mark', {}).get('name') == 'transcript':
+                        # Print user speech transcripts when available
+                        transcript = data.get('mark', {}).get('value', '')
+                        if transcript:
+                            print(f"User: \"{transcript}\"")
+                            # Add to the OpenAI handler's transcript
+                            openai_handler.conversation_transcript.append({"role": "user", "content": transcript})
+                            print(f"[DEBUG] Added user transcript to conversation: {transcript}")
+                            
+                            # Check for confirmation or rescheduling in user response
+                            lower_transcript = transcript.lower()
+                            if any(word in lower_transcript for word in ["yes", "confirm", "good", "fine", "okay", "sure", "correct"]):
+                                openai_handler.call_outcome = "confirmed"
+                                print(f"[DEBUG] Setting call outcome to: confirmed (from user response)")
+                            elif any(word in lower_transcript for word in ["no", "reschedule", "change", "different", "can't make", "unable"]):
+                                openai_handler.call_outcome = "rescheduled"
+                                print(f"[DEBUG] Setting call outcome to: rescheduled (from user response)")
                 elif data['event'] == 'stop':
                     print(f"Call {call_sid} has ended")
                     if openai_ws.open:
