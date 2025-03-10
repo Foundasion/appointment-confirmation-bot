@@ -173,14 +173,26 @@ async def handle_media_stream(websocket: WebSocket):
                         
                         # Update call data with transcript and outcome
                         if call_sid:
+                            print(f"[DEBUG] Call {call_sid} completed, updating transcript and outcome")
                             transcript = openai_handler.get_transcript()
                             outcome = openai_handler.get_call_outcome()
                             
-                            if outcome:
-                                twilio_handler.update_call_outcome(call_sid, outcome)
+                            print(f"[DEBUG] Retrieved transcript with {len(transcript)} items")
+                            print(f"[DEBUG] Retrieved outcome: {outcome}")
                             
-                            if transcript:
-                                twilio_handler.update_call_transcript(call_sid, transcript)
+                            # Always update the transcript, even if it's empty
+                            twilio_handler.update_call_transcript(call_sid, transcript)
+                            print(f"[DEBUG] Transcript updated for call {call_sid}")
+                            
+                            # Always update the outcome, even if it's None
+                            twilio_handler.update_call_outcome(call_sid, outcome)
+                            print(f"[DEBUG] Outcome updated for call {call_sid}")
+                            
+                            # Print the final state for debugging
+                            final_transcript = twilio_handler.get_call_transcript(call_sid)
+                            final_outcome = twilio_handler.get_call_outcome(call_sid)
+                            print(f"[DEBUG] Final transcript length: {len(final_transcript)}")
+                            print(f"[DEBUG] Final outcome: {final_outcome}")
                     except Exception as e:
                         print(f"Error sending initial conversation item: {e}")
                 except Exception as e:
@@ -218,6 +230,9 @@ async def process_audio_streams(websocket: WebSocket, openai_ws: websockets.WebS
                     transcript = data.get('mark', {}).get('value', '')
                     if transcript:
                         print(f"User: \"{transcript}\"")
+                        # Add to the OpenAI handler's transcript
+                        openai_handler.conversation_transcript.append({"role": "user", "content": transcript})
+                        print(f"[DEBUG] Added user transcript to conversation: {transcript}")
                 elif data['event'] == 'stop':
                     print(f"Call {call_sid} has ended")
                     if openai_ws.open:

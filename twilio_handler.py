@@ -131,23 +131,73 @@ class TwilioHandler:
     
     def update_call_transcript(self, call_sid: str, transcript: List[Dict[str, str]]) -> None:
         """Update the transcript for a call."""
+        print(f"[DEBUG] Updating transcript for call {call_sid}")
+        print(f"[DEBUG] Transcript length: {len(transcript) if transcript else 0}")
+        
         if call_sid in self.calls:
             self.calls[call_sid]['transcript'] = transcript
+            print(f"[DEBUG] Transcript updated successfully")
+        else:
+            print(f"[DEBUG] Call {call_sid} not found in active calls dictionary")
+            # Create the call entry if it doesn't exist
+            self.calls[call_sid] = {
+                'to': 'unknown',
+                'status': 'unknown',
+                'appointment_data': None,
+                'transcript': transcript,
+                'outcome': None
+            }
+            print(f"[DEBUG] Created new call entry for {call_sid}")
     
     def update_call_outcome(self, call_sid: str, outcome: str) -> None:
         """Update the outcome of a call."""
+        print(f"[DEBUG] Updating outcome for call {call_sid} to: {outcome}")
+        
         if call_sid in self.calls:
             self.calls[call_sid]['outcome'] = outcome
             print(f"Call {call_sid} outcome updated to: {outcome}")
+        else:
+            print(f"[DEBUG] Call {call_sid} not found in active calls dictionary")
+            # Create the call entry if it doesn't exist
+            self.calls[call_sid] = {
+                'to': 'unknown',
+                'status': 'unknown',
+                'appointment_data': None,
+                'transcript': [],
+                'outcome': outcome
+            }
+            print(f"[DEBUG] Created new call entry for {call_sid}")
     
     def get_call_transcript(self, call_sid: str) -> List[Dict[str, str]]:
         """Get the transcript for a call."""
+        print(f"[DEBUG] Getting transcript for call {call_sid}")
+        
         if call_sid in self.calls:
-            return self.calls[call_sid].get('transcript', [])
+            transcript = self.calls[call_sid].get('transcript', [])
+            print(f"[DEBUG] Found transcript with {len(transcript)} items")
+            return transcript
+        else:
+            print(f"[DEBUG] Call {call_sid} not found in active calls dictionary")
+            # Try to fetch from Twilio API
+            try:
+                call = self.client.calls(call_sid).fetch()
+                print(f"[DEBUG] Found call in Twilio API: {call.sid}")
+                # The call exists in Twilio but we don't have transcript data
+                return []
+            except Exception as e:
+                print(f"[DEBUG] Error fetching call from Twilio API: {e}")
+        
         return []
     
     def get_call_outcome(self, call_sid: str) -> Optional[str]:
         """Get the outcome of a call."""
+        print(f"[DEBUG] Getting outcome for call {call_sid}")
+        
         if call_sid in self.calls:
-            return self.calls[call_sid].get('outcome')
+            outcome = self.calls[call_sid].get('outcome')
+            print(f"[DEBUG] Found outcome: {outcome}")
+            return outcome
+        else:
+            print(f"[DEBUG] Call {call_sid} not found in active calls dictionary")
+        
         return None

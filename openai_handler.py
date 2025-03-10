@@ -30,14 +30,23 @@ Your personality:
 - Empathetic and understanding when patients need to reschedule
 - Enthusiastic about helping patients
 
+IMPORTANT CONVERSATION GUIDELINES:
+- Keep your responses brief and conversational
+- ALWAYS PAUSE after asking a question to allow the person to respond
+- DO NOT continue speaking or ask multiple questions in a row
+- Listen carefully to the person's responses and acknowledge what they say
+- If they sound rushed or busy, be respectful of their time
+- Add small personal touches like "Hope you're having a good day" when appropriate
+
 Your task is to:
 1. Start by immediately identifying yourself: "Hi, this is Samantha, an automated assistant calling from DentaVille Dental Clinic"
-2. Ask if it's a good time to talk about their upcoming appointment
-3. Confirm their upcoming appointment (date, time, dentist)
-4. If they confirm, express genuine appreciation and end the call warmly
-5. If they need to reschedule, be understanding and help find a convenient alternative time
-6. Do not discuss medical details or personal health information
-7. End the call with a clear summary of the outcome (confirmed or rescheduled) and a friendly closing
+2. Ask if it's a good time to talk about their upcoming appointment - THEN WAIT for their response
+3. If they say it's a good time, briefly ask how they're doing today before discussing the appointment
+4. Confirm their upcoming appointment (date, time, dentist) - THEN WAIT for their response
+5. If they confirm, express genuine appreciation and end the call warmly
+6. If they need to reschedule, be understanding and help find a convenient alternative time
+7. Do not discuss medical details or personal health information
+8. End the call with a clear summary of the outcome (confirmed or rescheduled) and a friendly closing
 
 Always disclose that you are an automated assistant calling on behalf of DentaVille Dental Clinic at the beginning of the call.
 """
@@ -80,12 +89,25 @@ class OpenAIRealtimeHandler:
             print(f"Added appointment details to system message: {self.appointment_data}")
         else:
             print("No appointment data available for system message")
+            
+        # Initialize the transcript with a system entry
+        self.conversation_transcript = [
+            {"role": "system", "content": "Call initiated with appointment confirmation bot."}
+        ]
+        print(f"[DEBUG] Initialized transcript with system message")
         
         # Send session update to OpenAI
         session_update = {
             "type": "session.update",
             "session": {
-                "turn_detection": {"type": "server_vad"},
+                "turn_detection": {
+                    "type": "server_vad",
+                    "threshold": 0.3,  # Lower threshold to detect speech more easily
+                    "silence_duration_ms": 500,  # Longer silence to wait for user to finish speaking
+                    "prefix_padding_ms": 500,  # More padding before detecting speech
+                    "create_response": True,
+                    "interrupt_response": True
+                },
                 "input_audio_format": "g711_ulaw",
                 "output_audio_format": "g711_ulaw",
                 "voice": VOICE,
@@ -132,29 +154,34 @@ class OpenAIRealtimeHandler:
             
             greeting = (
                 f"Hi there! This is Samantha, an automated assistant calling from DentaVille Dental Clinic. "
-                f"Is this {patient_name}? I'm calling about your dental appointment with Dr. {dentist} "
-                f"scheduled for {date} at {time}. Is now a good time to chat for a moment?"
+                f"Is this {patient_name}? Is now a good time for a quick chat about your upcoming appointment?"
             )
         else:
             greeting = (
                 f"Hi there! This is Samantha, an automated assistant calling from DentaVille Dental Clinic. "
-                f"I'm calling about your upcoming dental appointment. Is now a good time to chat for a moment?"
+                f"Is now a good time for a quick chat about your upcoming appointment?"
             )
         
-        initial_conversation_item = {
+        # First, send a system message to set the context
+        print(f"AI will start with: \"{greeting}\"")
+        
+        # Create a conversation item as a system message
+        system_message = {
             "type": "conversation.item.create",
             "item": {
                 "type": "message",
-                "role": "user",
+                "role": "system",
                 "content": [
                     {
                         "type": "input_text",
-                        "text": greeting
+                        "text": f"The call has just started. You are making the first contact. Begin with: {greeting}"
                     }
                 ]
             }
         }
-        await openai_ws.send(json.dumps(initial_conversation_item))
+        await openai_ws.send(json.dumps(system_message))
+        
+        # Then trigger a response
         await openai_ws.send(json.dumps({"type": "response.create"}))
         
         # Add to transcript
@@ -170,13 +197,17 @@ class OpenAIRealtimeHandler:
             if content:
                 self.conversation_transcript.append({"role": "assistant", "content": content})
                 print(f"AI: \"{content}\"")
+                print(f"[DEBUG] Adding to transcript: {content}")
+                print(f"[DEBUG] Current transcript length: {len(self.conversation_transcript)}")
                 
                 # Check for appointment confirmation or rescheduling in the response
                 lower_content = content.lower()
                 if "confirm" in lower_content and "appointment" in lower_content:
                     self.call_outcome = "confirmed"
+                    print(f"[DEBUG] Setting call outcome to: confirmed")
                 elif "reschedule" in lower_content:
                     self.call_outcome = "rescheduled"
+                    print(f"[DEBUG] Setting call outcome to: rescheduled")
         # Log only error events
         elif response['type'] == 'error':
             print(f"Received error from OpenAI: {response}")
@@ -185,8 +216,10 @@ class OpenAIRealtimeHandler:
     
     def get_transcript(self) -> list:
         """Get the conversation transcript."""
+        print(f"[DEBUG] Returning transcript with {len(self.conversation_transcript)} items")
         return self.conversation_transcript
     
     def get_call_outcome(self) -> Optional[str]:
         """Get the outcome of the call (confirmed, rescheduled, or None)."""
+        print(f"[DEBUG] Returning call outcome: {self.call_outcome}")
         return self.call_outcome
